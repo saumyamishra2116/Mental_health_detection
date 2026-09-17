@@ -1,236 +1,389 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mental Health Signal — Student Wellness Analytics</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css" />
-</head>S
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mental Health Detector — Student Wellness & Habits Score</title>
+  
+  <!-- Clean, authentic typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for habit comparison -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
 <body>
 
-<div class="noise-overlay" aria-hidden="true"></div>
-
-<header class="site-header">
-  <div class="header-inner">
-    <span class="eyebrow">Student Wellness Analytics</span>
-    <h1 class="title">Mental Health <em>Signal</em></h1>
-    <p class="subtitle">A quick read on how habits, screen time, and stress are trending — modeled from your daily rhythm, not a diagnosis.</p>
-  </div>
-</header>
-
-<main class="layout">
-
-  <!-- FORM PANEL -->
-  <section class="panel form-panel" aria-labelledby="form-heading">
-    <form id="predict-form" novalidate>
-
-      <fieldset class="group">
-        <legend><span class="legend-index">01</span> Profile</legend>
-        <div class="grid grid-3">
-          <div class="field">
-            <label for="age">Age</label>
-            <input type="number" id="age" name="age" min="10" max="100" step="1" required placeholder="e.g. 21" />
-            <span class="hint">10–100</span>
-            <span class="error-msg" data-for="age"></span>
-          </div>
-          <div class="field">
-            <label for="gender">Gender</label>
-            <select id="gender" name="gender" required>
-              <option value="" disabled selected hidden>Select</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-            </select>
-            <span class="error-msg" data-for="gender"></span>
-          </div>
-          <div class="field">
-            <label for="country">Country</label>
-            <input type="text" id="country" name="country" list="country-list" required placeholder="e.g. India" autocomplete="off" />
-            <datalist id="country-list">
-              <option value="India"></option>
-              <option value="USA"></option>
-              <option value="Canada"></option>
-              <option value="Australia"></option>
-              <option value="UK"></option>
-              <option value="Germany"></option>
-              <option value="Mexico"></option>
-              <option value="Turkey"></option>
-              <option value="France"></option>
-            </datalist>
-            <span class="hint">Not listed? Type it anyway.</span>
-            <span class="error-msg" data-for="country"></span>
-          </div>
+  <!-- Top Navigation -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <div class="brand-logo">
+          <i data-lucide="heart-pulse"></i>
         </div>
-      </fieldset>
-
-      <fieldset class="group">
-        <legend><span class="legend-index">02</span> Academic &amp; Digital Habits</legend>
-        <div class="grid grid-2">
-          <div class="field">
-            <label for="academic_level">Academic level</label>
-            <select id="academic_level" name="academic_level" required>
-              <option value="" disabled selected hidden>Select</option>
-              <option value="High School">High School</option>
-              <option value="Undergraduate">Undergraduate</option>
-              <option value="Graduate">Graduate</option>
-            </select>
-            <span class="error-msg" data-for="academic_level"></span>
-          </div>
-          <div class="field">
-            <label for="most_used_platform">Most-used platform</label>
-            <select id="most_used_platform" name="most_used_platform" required>
-              <option value="" disabled selected hidden>Select</option>
-              <option value="Facebook">Facebook</option>
-              <option value="Instagram">Instagram</option>
-              <option value="Snapchat">Snapchat</option>
-              <option value="Twitter">Twitter</option>
-              <option value="YouTube">YouTube</option>
-              <option value="TikTok">TikTok</option>
-              <option value="LinkedIn">LinkedIn</option>
-              <option value="LINE">LINE</option>
-              <option value="KakaoTalk">KakaoTalk</option>
-              <option value="VKontakte">VKontakte</option>
-              <option value="WhatsApp">WhatsApp</option>
-              <option value="WeChat">WeChat</option>
-            </select>
-            <span class="error-msg" data-for="most_used_platform"></span>
-          </div>
-          <div class="field">
-            <label for="purpose_of_use">Primary purpose</label>
-            <select id="purpose_of_use" name="purpose_of_use" required>
-              <option value="" disabled selected hidden>Select</option>
-              <option value="Networking">Networking</option>
-              <option value="Education">Education</option>
-              <option value="Entertainment">Entertainment</option>
-              <option value="News">News</option>
-            </select>
-            <span class="error-msg" data-for="purpose_of_use"></span>
-          </div>
-          <div class="field">
-            <label for="avg_daily_usage_hours">Avg. daily screen time</label>
-            <div class="unit-input">
-              <input type="number" id="avg_daily_usage_hours" name="avg_daily_usage_hours" min="0" max="24" step="0.1" required placeholder="0.0" />
-              <span class="unit">hrs</span>
-            </div>
-            <span class="error-msg" data-for="avg_daily_usage_hours"></span>
-          </div>
-          <div class="field">
-            <label for="daily_unlocks">Daily phone unlocks</label>
-            <input type="number" id="daily_unlocks" name="daily_unlocks" min="0" step="1" required placeholder="e.g. 60" />
-            <span class="error-msg" data-for="daily_unlocks"></span>
-          </div>
+        <div class="brand-text">
+          <span class="brand-title">Mental Health Detector</span>
+          <span class="brand-tagline">Student Wellness Assessment</span>
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset class="group">
-        <legend><span class="legend-index">03</span> Lifestyle &amp; Stress</legend>
-        <div class="grid grid-3">
-          <div class="field">
-            <label for="study_hours">Study hours / day</label>
-            <div class="unit-input">
-              <input type="number" id="study_hours" name="study_hours" min="0" max="24" step="0.1" required placeholder="0.0" />
-              <span class="unit">hrs</span>
-            </div>
-            <span class="error-msg" data-for="study_hours"></span>
-          </div>
-          <div class="field">
-            <label for="physical_activity_hours">Physical activity / day</label>
-            <div class="unit-input">
-              <input type="number" id="physical_activity_hours" name="physical_activity_hours" min="0" max="24" step="0.1" required placeholder="0.0" />
-              <span class="unit">hrs</span>
-            </div>
-            <span class="error-msg" data-for="physical_activity_hours"></span>
-          </div>
-          <div class="field">
-            <label for="sleep_hours_per_night">Sleep / night</label>
-            <div class="unit-input">
-              <input type="number" id="sleep_hours_per_night" name="sleep_hours_per_night" min="0" max="24" step="0.1" required placeholder="0.0" />
-              <span class="unit">hrs</span>
-            </div>
-            <span class="error-msg" data-for="sleep_hours_per_night"></span>
-          </div>
-          <div class="field field-span">
-            <label for="stress_level">Perceived stress level</label>
-            <div class="segmented" id="stress_level_group" data-name="stress_level">
-              <button type="button" class="seg-btn" data-value="Low">Low</button>
-              <button type="button" class="seg-btn" data-value="Medium">Medium</button>
-              <button type="button" class="seg-btn" data-value="High">High</button>
-              <button type="button" class="seg-btn" data-value="Very High">Very High</button>
-            </div>
-            <input type="hidden" id="stress_level" name="stress_level" required />
-            <span class="error-msg" data-for="stress_level"></span>
-          </div>
-        </div>
-      </fieldset>
+      <div class="nav-actions">
+        <!-- Sample data filler -->
+        <button type="button" class="btn btn-outline btn-sm" id="sample-data-btn" title="Fill with example student data">
+          <i data-lucide="sparkles"></i> Fill Sample Data
+        </button>
 
-      <div class="form-footer">
-        <button type="submit" class="submit-btn" id="submit-btn">
-          <span class="btn-label">Read my signal</span>
-          <span class="btn-spinner" aria-hidden="true"></span>
+        <!-- Theme toggle -->
+        <button type="button" class="btn-icon" id="theme-toggle" aria-label="Toggle dark mode">
+          <i data-lucide="moon" class="theme-icon-dark"></i>
+          <i data-lucide="sun" class="theme-icon-light"></i>
         </button>
       </div>
-    </form>
-  </section>
+    </div>
+  </header>
 
-  <!-- RESULT PANEL -->
-  <aside class="panel result-panel" aria-live="polite">
-    <div class="result-inner" id="result-inner">
-
-      <div class="state state-idle" id="state-idle">
-        <svg class="gauge gauge-idle" viewBox="0 0 240 160" aria-hidden="true">
-          <path class="gauge-track" d="M 30 140 A 100 100 0 0 1 210 140" />
-          <g class="gauge-ticks"></g>
-        </svg>
-        <p class="idle-label">Your score will appear here</p>
-        <p class="idle-copy">Fill in the form and submit to generate a predicted mental health score from 0–10.</p>
+  <!-- Main Content Layout -->
+  <main class="page-container">
+    
+    <!-- Hero Intro with colorful soft gradient -->
+    <section class="intro-section">
+      <div class="intro-badge">
+        <span class="badge-dot"></span>
+        <span>Student Wellness & Habit Calculator</span>
       </div>
+      <h1 class="intro-heading">Understand How Your Habits Shape Your Well-being</h1>
+      <p class="intro-lead">
+        See how your daily routine—screen time, sleep schedule, study blocks, and exercise—interacts with your perceived stress and overall mental health.
+      </p>
+    </section>
 
-      <div class="state state-loading" id="state-loading" hidden>
-        <div class="pulse-ring"></div>
-        <p class="loading-label">Reading the signal…</p>
-        <p class="loading-copy">Running your habits through the model.</p>
-      </div>
+    <!-- Two-column workspace -->
+    <div class="content-grid">
+      
+      <!-- FORM SECTION (Left) -->
+      <section class="form-section">
+        <form id="wellness-form" novalidate>
+          
+          <!-- Section 1: Basic Information -->
+          <div class="card card-accent-blue">
+            <div class="card-header">
+              <div class="card-badge badge-blue">
+                <i data-lucide="user"></i>
+              </div>
+              <div>
+                <h2 class="card-title">1. Student Profile</h2>
+                <p class="card-desc">Basic academic background & demographics</p>
+              </div>
+            </div>
 
-      <div class="state state-result" id="state-result" hidden>
-        <svg class="gauge gauge-result" viewBox="0 0 240 160" aria-hidden="true">
-          <defs>
-            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#D9534F"/>
-              <stop offset="45%" stop-color="#E3B341"/>
-              <stop offset="100%" stop-color="#4C9A78"/>
-            </linearGradient>
-          </defs>
-          <path class="gauge-track" d="M 30 140 A 100 100 0 0 1 210 140" />
-          <path class="gauge-fill" id="gauge-fill" d="M 30 140 A 100 100 0 0 1 210 140" />
-          <g class="gauge-ticks"></g>
-          <circle class="gauge-needle-hub" cx="120" cy="140" r="5" />
-        </svg>
-        <div class="score-readout">
-          <span class="score-number" id="score-number">0.0</span>
-          <span class="score-max">/10</span>
+            <div class="form-row form-row-3">
+              <!-- Age -->
+              <div class="form-group">
+                <label for="age">Age</label>
+                <div class="input-suffix-wrapper">
+                  <input type="number" id="age" name="age" min="10" max="100" value="21" required />
+                  <span class="input-suffix">yrs</span>
+                </div>
+                <span class="error-text" data-error-for="age"></span>
+              </div>
+
+              <!-- Gender -->
+              <div class="form-group">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender" required>
+                  <option value="Male" selected>Male</option>
+                  <option value="Female">Female</option>
+                </select>
+                <span class="error-text" data-error-for="gender"></span>
+              </div>
+
+              <!-- Academic Level -->
+              <div class="form-group">
+                <label for="academic_level">Education Level</label>
+                <select id="academic_level" name="academic_level" required>
+                  <option value="Undergraduate" selected>Undergraduate</option>
+                  <option value="High School">High School</option>
+                  <option value="Graduate">Graduate</option>
+                </select>
+                <span class="error-text" data-error-for="academic_level"></span>
+              </div>
+            </div>
+
+            <!-- Country -->
+            <div class="form-group">
+              <label for="country">Country</label>
+              <input type="text" id="country" name="country" list="country-options" value="India" placeholder="Enter your country" required />
+              <datalist id="country-options">
+                <option value="India">
+                <option value="USA">
+                <option value="Canada">
+                <option value="Australia">
+                <option value="UK">
+                <option value="Germany">
+                <option value="Mexico">
+                <option value="Turkey">
+                <option value="France">
+                <option value="Other">
+              </datalist>
+              <span class="error-text" data-error-for="country"></span>
+            </div>
+          </div>
+
+          <!-- Section 2: Screen & Social Media Habits -->
+          <div class="card card-accent-purple">
+            <div class="card-header">
+              <div class="card-badge badge-purple">
+                <i data-lucide="smartphone"></i>
+              </div>
+              <div>
+                <h2 class="card-title">2. Screen & Social Media</h2>
+                <p class="card-desc">Your daily digital intake and favorite apps</p>
+              </div>
+            </div>
+
+            <div class="form-row form-row-2">
+              <!-- Most used platform -->
+              <div class="form-group">
+                <label for="most_used_platform">Top Social App</label>
+                <select id="most_used_platform" name="most_used_platform" required>
+                  <option value="Instagram" selected>📸 Instagram</option>
+                  <option value="YouTube">▶️ YouTube</option>
+                  <option value="WhatsApp">💬 WhatsApp</option>
+                  <option value="LinkedIn">💼 LinkedIn</option>
+                  <option value="Twitter">𝕏 Twitter / X</option>
+                  <option value="Snapchat">👻 Snapchat</option>
+                  <option value="TikTok">🎵 TikTok</option>
+                  <option value="Facebook">👥 Facebook</option>
+                  <option value="WeChat">🟢 WeChat</option>
+                  <option value="LINE">🟩 LINE</option>
+                  <option value="KakaoTalk">🟡 KakaoTalk</option>
+                  <option value="VKontakte">🔷 VKontakte</option>
+                </select>
+                <span class="error-text" data-error-for="most_used_platform"></span>
+              </div>
+
+              <!-- Purpose -->
+              <div class="form-group">
+                <label for="purpose_of_use">Primary Purpose</label>
+                <select id="purpose_of_use" name="purpose_of_use" required>
+                  <option value="Entertainment" selected>🎭 Entertainment & Relaxing</option>
+                  <option value="Education">📚 Study & Tutorials</option>
+                  <option value="Networking">🤝 Friends & Networking</option>
+                  <option value="News">📰 News & Daily Updates</option>
+                </select>
+                <span class="error-text" data-error-for="purpose_of_use"></span>
+              </div>
+            </div>
+
+            <div class="form-row form-row-2">
+              <!-- Daily Screen Time -->
+              <div class="form-group">
+                <div class="label-with-value">
+                  <label for="avg_daily_usage_hours">Daily Screen Time</label>
+                  <span class="range-display badge-pink" id="screen-time-val">4.5 hrs/day</span>
+                </div>
+                <input type="range" id="avg_daily_usage_hours" name="avg_daily_usage_hours" min="0" max="18" step="0.5" value="4.5" class="slider slider-pink" />
+                <span class="field-hint">Hours spent on social media and mobile apps.</span>
+                <span class="error-text" data-error-for="avg_daily_usage_hours"></span>
+              </div>
+
+              <!-- Phone Unlocks -->
+              <div class="form-group">
+                <div class="label-with-value">
+                  <label for="daily_unlocks">Phone Unlocks</label>
+                  <span class="range-display badge-purple" id="unlocks-val">80 times</span>
+                </div>
+                <input type="range" id="daily_unlocks" name="daily_unlocks" min="10" max="250" step="5" value="80" class="slider slider-purple" />
+                <span class="field-hint">Estimated device checks and unlocks per day.</span>
+                <span class="error-text" data-error-for="daily_unlocks"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Daily Routine & Stress -->
+          <div class="card card-accent-emerald">
+            <div class="card-header">
+              <div class="card-badge badge-emerald">
+                <i data-lucide="sun"></i>
+              </div>
+              <div>
+                <h2 class="card-title">3. Routine, Rest & Stress</h2>
+                <p class="card-desc">Sleep restorative rhythm, exercise, and tension</p>
+              </div>
+            </div>
+
+            <div class="form-row form-row-3">
+              <!-- Sleep -->
+              <div class="form-group">
+                <div class="label-with-value">
+                  <label for="sleep_hours_per_night">Sleep / Night</label>
+                  <span class="range-display badge-blue" id="sleep-val">7.0 hrs</span>
+                </div>
+                <input type="range" id="sleep_hours_per_night" name="sleep_hours_per_night" min="2" max="14" step="0.5" value="7.0" class="slider slider-blue" />
+                <span class="field-hint">Target: 7–9 hrs.</span>
+                <span class="error-text" data-error-for="sleep_hours_per_night"></span>
+              </div>
+
+              <!-- Study -->
+              <div class="form-group">
+                <div class="label-with-value">
+                  <label for="study_hours">Study / Day</label>
+                  <span class="range-display badge-amber" id="study-val">5.0 hrs</span>
+                </div>
+                <input type="range" id="study_hours" name="study_hours" min="0" max="16" step="0.5" value="5.0" class="slider slider-amber" />
+                <span class="field-hint">Study hours outside class.</span>
+                <span class="error-text" data-error-for="study_hours"></span>
+              </div>
+
+              <!-- Exercise -->
+              <div class="form-group">
+                <div class="label-with-value">
+                  <label for="physical_activity_hours">Exercise / Day</label>
+                  <span class="range-display badge-emerald" id="exercise-val">1.0 hrs</span>
+                </div>
+                <input type="range" id="physical_activity_hours" name="physical_activity_hours" min="0" max="6" step="0.25" value="1.0" class="slider slider-emerald" />
+                <span class="field-hint">Walking, gym, sports.</span>
+                <span class="error-text" data-error-for="physical_activity_hours"></span>
+              </div>
+            </div>
+
+            <!-- Stress Level Selector -->
+            <div class="form-group">
+              <label>Perceived Stress Level</label>
+              <div class="pill-selector" id="stress-selector">
+                <label class="pill-option pill-low">
+                  <input type="radio" name="stress_level" value="Low" />
+                  <span>Low</span>
+                </label>
+                <label class="pill-option pill-medium">
+                  <input type="radio" name="stress_level" value="Medium" checked />
+                  <span>Medium</span>
+                </label>
+                <label class="pill-option pill-high">
+                  <input type="radio" name="stress_level" value="High" />
+                  <span>High</span>
+                </label>
+                <label class="pill-option pill-veryhigh">
+                  <input type="radio" name="stress_level" value="Very High" />
+                  <span>Very High</span>
+                </label>
+              </div>
+              <span class="error-text" data-error-for="stress_level"></span>
+            </div>
+          </div>
+
+          <!-- Submission Button -->
+          <div class="form-actions">
+            <button type="reset" class="btn btn-secondary" id="reset-btn">Reset</button>
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+              <span class="spinner" id="btn-spinner" aria-hidden="true"></span>
+              <span id="btn-text"><i data-lucide="sparkles"></i> Calculate Wellness Score</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- RESULTS SECTION (Right) -->
+      <aside class="results-section">
+        
+        <!-- Idle Placeholder -->
+        <div class="card result-card state-box" id="result-idle">
+          <div class="idle-icon-wrap">
+            <i data-lucide="clipboard-check"></i>
+          </div>
+          <h3 class="state-title">Your Score Will Appear Here</h3>
+          <p class="state-desc">
+            Adjust your daily screen time, sleep, and habits on the left, then click <strong>Calculate Wellness Score</strong> to evaluate your balance.
+          </p>
+          <div class="feature-bullets">
+            <span class="f-item"><i data-lucide="check" class="icon-green"></i> Habit breakdown</span>
+            <span class="f-item"><i data-lucide="check" class="icon-blue"></i> Benchmark comparison</span>
+            <span class="f-item"><i data-lucide="check" class="icon-purple"></i> Practical takeaways</span>
+          </div>
         </div>
-        <p class="score-band" id="score-band">—</p>
-        <p class="score-context" id="score-context"></p>
-        <button type="button" class="reset-btn" id="reset-btn">Run another read</button>
-      </div>
 
-      <div class="state state-error" id="state-error" hidden>
-        <div class="error-icon" aria-hidden="true">!</div>
-        <p class="error-copy" id="error-copy"></p>
-        <button type="button" class="reset-btn" id="error-retry-btn">Try again</button>
-      </div>
+        <!-- Loading State -->
+        <div class="card result-card state-box" id="result-loading" style="display: none;">
+          <div class="spinner-large"></div>
+          <h3 class="state-title">Analyzing your routine...</h3>
+          <p class="state-desc">Evaluating your habits against student wellness data.</p>
+        </div>
+
+        <!-- Error State -->
+        <div class="card result-card state-box" id="result-error" style="display: none;">
+          <div class="error-icon-wrap">
+            <i data-lucide="alert-triangle"></i>
+          </div>
+          <h3 class="state-title" id="error-heading">Unable to Calculate</h3>
+          <p class="state-desc" id="error-message">Could not connect to the backend server. Please make sure it is running.</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="retry-btn">Try Again</button>
+        </div>
+
+        <!-- Result Content -->
+        <div class="card result-card result-card-active" id="result-content" style="display: none;">
+          
+          <!-- Score Summary Box -->
+          <div class="score-box" id="score-box-container">
+            <span class="score-label">Mental Well-being Score</span>
+            <div class="score-number-wrap">
+              <span class="score-number" id="score-display">0.0</span>
+              <span class="score-max">/ 10</span>
+            </div>
+            <div class="score-badge-wrap">
+              <span class="score-status-badge" id="score-badge">Healthy Balance</span>
+            </div>
+            <p class="score-summary-text" id="score-summary-text">
+              Your daily rhythm is in a healthy range with good sleep and reasonable screen habits.
+            </p>
+          </div>
+
+          <!-- Comparison Bar Chart -->
+          <div class="chart-box">
+            <h4 class="box-heading">Your Routine vs Healthy Targets</h4>
+            <div class="chart-container">
+              <canvas id="habitChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Key Recommendations -->
+          <div class="recommendations-box">
+            <h4 class="box-heading">Practical Takeaways</h4>
+            <ul class="recs-list" id="recs-list">
+              <!-- Inserted dynamically -->
+            </ul>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="result-actions">
+            <button type="button" class="btn btn-outline btn-sm" id="copy-btn">
+              <i data-lucide="copy"></i> Copy Summary
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="retest-btn">
+              <i data-lucide="rotate-ccw"></i> Recalculate
+            </button>
+          </div>
+
+        </div>
+      </aside>
 
     </div>
-  </aside>
 
-</main>
+    <!-- Footer -->
+    <footer class="page-footer">
+      <p class="disclaimer">
+        <strong>Note:</strong> This tool uses a machine learning model trained on student lifestyle and social media surveys. It is intended for educational self-reflection, not clinical diagnosis. If you are struggling with distress or anxiety, please reach out to a student counselor, family member, or trusted professional.
+      </p>
+    </footer>
+  </main>
 
-<footer class="site-footer">
-  <p>Built for informational purposes only — this is not a clinical assessment. If you're struggling, please talk to someone you trust.</p>
-</footer>
+  <div id="toast" class="toast"></div>
 
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

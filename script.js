@@ -1,304 +1,525 @@
+/**
+ * Mental Health Detector — Student Wellness Assessment
+ * Clean, lightweight, human-crafted client logic.
+ */
+
 (() => {
   "use strict";
 
-  const API_BASE = "https://mansik-santulan-score.onrender.com";
+  const CLOUD_API = "https://mansik-santulan-score.onrender.com";
 
-  const form = document.getElementById("predict-form");
+  // Elements
+  const form = document.getElementById("wellness-form");
   const submitBtn = document.getElementById("submit-btn");
   const resetBtn = document.getElementById("reset-btn");
-  const errorRetryBtn = document.getElementById("error-retry-btn");
+  const sampleDataBtn = document.getElementById("sample-data-btn");
+  const themeToggle = document.getElementById("theme-toggle");
+  const toast = document.getElementById("toast");
 
-  const stateIdle = document.getElementById("state-idle");
-  const stateLoading = document.getElementById("state-loading");
-  const stateResult = document.getElementById("state-result");
-  const stateError = document.getElementById("state-error");
+  // State Containers
+  const resultIdle = document.getElementById("result-idle");
+  const resultLoading = document.getElementById("result-loading");
+  const resultError = document.getElementById("result-error");
+  const resultContent = document.getElementById("result-content");
+  const retryBtn = document.getElementById("retry-btn");
+  const retestBtn = document.getElementById("retest-btn");
+  const copyBtn = document.getElementById("copy-btn");
 
-  const scoreNumberEl = document.getElementById("score-number");
-  const scoreBandEl = document.getElementById("score-band");
-  const scoreContextEl = document.getElementById("score-context");
-  const gaugeFill = document.getElementById("gauge-fill");
-  const errorLabelEl = document.getElementById("error-label");
-  const errorCopyEl = document.getElementById("error-copy");
+  // Results Outputs
+  const scoreDisplay = document.getElementById("score-display");
+  const scoreBadge = document.getElementById("score-badge");
+  const scoreSummaryText = document.getElementById("score-summary-text");
+  const recsList = document.getElementById("recs-list");
 
-  const GAUGE_ARC_LENGTH = 314; // approx pi * r(100)
+  let habitChart = null;
+  let currentScore = 0;
 
-  // ---------------------------------------------------------
-  // Draw tick marks on both gauges (0..10, every 2 units)
-  // ---------------------------------------------------------
-  function drawTicks() {
-    document.querySelectorAll(".gauge-ticks").forEach((g) => {
-      g.innerHTML = "";
-      const cx = 120, cy = 140, rOuter = 100, rInner = 90;
-      for (let i = 0; i <= 10; i += 2) {
-        const angle = Math.PI - (i / 10) * Math.PI; // 180deg -> 0deg
-        const x1 = cx + rOuter * Math.cos(angle);
-        const y1 = cy - rOuter * Math.sin(angle);
-        const x2 = cx + rInner * Math.cos(angle);
-        const y2 = cy - rInner * Math.sin(angle);
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", x1.toFixed(1));
-        line.setAttribute("y1", y1.toFixed(1));
-        line.setAttribute("x2", x2.toFixed(1));
-        line.setAttribute("y2", y2.toFixed(1));
-        g.appendChild(line);
-      }
+  // -------------------------------------------------------------------------
+  // 1. Theme Management
+  // -------------------------------------------------------------------------
+  function initTheme() {
+    const saved = localStorage.getItem("ms_theme") || "light";
+    document.documentElement.setAttribute("data-theme", saved);
+
+    themeToggle.addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme");
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("ms_theme", next);
+      if (habitChart) updateChartColors();
     });
   }
-  drawTicks();
 
-  // ---------------------------------------------------------
-  // Segmented control (stress_level) wiring
-  // ---------------------------------------------------------
-  const segGroup = document.getElementById("stress_level_group");
-  const stressHiddenInput = document.getElementById("stress_level");
-  segGroup.querySelectorAll(".seg-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      segGroup.querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      stressHiddenInput.value = btn.dataset.value;
-      clearFieldError(stressHiddenInput);
-    });
-  });
-
-  // ---------------------------------------------------------
-  // Field-level error helpers
-  // ---------------------------------------------------------
-  function fieldWrapper(input) {
-    return input.closest(".field");
+  // -------------------------------------------------------------------------
+  // 2. Toast Utility
+  // -------------------------------------------------------------------------
+  function showToast(msg) {
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => {
+      toast.classList.remove("show");
+    }, 2800);
   }
 
-  function setFieldError(input, message) {
-    const wrap = fieldWrapper(input);
-    if (!wrap) return;
-    wrap.classList.add("field-error");
-    const msgEl = wrap.querySelector(".error-msg");
-    if (msgEl) msgEl.textContent = message;
-  }
-
-  function clearFieldError(input) {
-    const wrap = fieldWrapper(input);
-    if (!wrap) return;
-    wrap.classList.remove("field-error");
-    const msgEl = wrap.querySelector(".error-msg");
-    if (msgEl) msgEl.textContent = "";
-  }
-
-  function clearAllErrors() {
-    form.querySelectorAll(".field").forEach((f) => f.classList.remove("field-error"));
-    form.querySelectorAll(".error-msg").forEach((m) => (m.textContent = ""));
-  }
-
-  // ---------------------------------------------------------
-  // Client-side validation mirroring the StudentData model
-  // ---------------------------------------------------------
-  function validate(payload) {
-    const errors = [];
-
-    const numericChecks = [
-      ["age", 10, 100],
-      ["avg_daily_usage_hours", 0, 24],
-      ["daily_unlocks", 0, Infinity],
-      ["study_hours", 0, 24],
-      ["physical_activity_hours", 0, 24],
-      ["sleep_hours_per_night", 0, 24],
+  // -------------------------------------------------------------------------
+  // 3. Slider Value Sync
+  // -------------------------------------------------------------------------
+  function initSliders() {
+    const sliders = [
+      { id: "avg_daily_usage_hours", displayId: "screen-time-val", unit: "hrs/day" },
+      { id: "daily_unlocks", displayId: "unlocks-val", unit: "times" },
+      { id: "sleep_hours_per_night", displayId: "sleep-val", unit: "hrs" },
+      { id: "study_hours", displayId: "study-val", unit: "hrs" },
+      { id: "physical_activity_hours", displayId: "exercise-val", unit: "hrs" },
     ];
 
-    numericChecks.forEach(([key, min, max]) => {
-      const input = document.getElementById(key);
-      const val = payload[key];
-      if (val === "" || val === null || Number.isNaN(val)) {
-        errors.push([input, "This field is required."]);
-      } else if (val < min || val > max) {
-        errors.push([input, `Must be between ${min} and ${max === Infinity ? "0+" : max}.`]);
-      }
+    sliders.forEach(({ id, displayId, unit }) => {
+      const input = document.getElementById(id);
+      const display = document.getElementById(displayId);
+      if (!input || !display) return;
+
+      const update = () => {
+        const val = parseFloat(input.value);
+        display.textContent = `${val.toFixed(val % 1 === 0 ? 0 : 1)} ${unit}`;
+      };
+
+      input.addEventListener("input", update);
+      update();
     });
-
-    ["gender", "country", "academic_level", "most_used_platform", "purpose_of_use"].forEach((key) => {
-      const input = document.getElementById(key);
-      if (!payload[key] || String(payload[key]).trim() === "") {
-        errors.push([input, "This field is required."]);
-      }
-    });
-
-    if (!payload.stress_level) {
-      errors.push([stressHiddenInput, "Pick a stress level."]);
-    }
-
-    return errors;
   }
 
-  // ---------------------------------------------------------
-  // Gather form data into the exact StudentData shape
-  // ---------------------------------------------------------
-  function collectPayload() {
+  // -------------------------------------------------------------------------
+  // 4. Sample Data Filler
+  // -------------------------------------------------------------------------
+  function fillSampleData() {
+    document.getElementById("age").value = 21;
+    document.getElementById("gender").value = "Male";
+    document.getElementById("academic_level").value = "Undergraduate";
+    document.getElementById("country").value = "India";
+    document.getElementById("most_used_platform").value = "Instagram";
+    document.getElementById("purpose_of_use").value = "Entertainment";
+
+    document.getElementById("avg_daily_usage_hours").value = 3.5;
+    document.getElementById("daily_unlocks").value = 70;
+    document.getElementById("sleep_hours_per_night").value = 7.5;
+    document.getElementById("study_hours").value = 5.0;
+    document.getElementById("physical_activity_hours").value = 1.0;
+
+    const mediumRadio = document.querySelector('input[name="stress_level"][value="Medium"]');
+    if (mediumRadio) mediumRadio.checked = true;
+
+    // Trigger input events to update range text displays
+    document.getElementById("avg_daily_usage_hours").dispatchEvent(new Event("input"));
+    document.getElementById("daily_unlocks").dispatchEvent(new Event("input"));
+    document.getElementById("sleep_hours_per_night").dispatchEvent(new Event("input"));
+    document.getElementById("study_hours").dispatchEvent(new Event("input"));
+    document.getElementById("physical_activity_hours").dispatchEvent(new Event("input"));
+
+    clearErrors();
+    showToast("Filled sample student profile");
+  }
+
+  // -------------------------------------------------------------------------
+  // 5. Validation & Payload Gathering
+  // -------------------------------------------------------------------------
+  function clearErrors() {
+    document.querySelectorAll(".error-text").forEach((el) => {
+      el.textContent = "";
+      el.classList.remove("visible");
+    });
+  }
+
+  function setError(field, msg) {
+    const el = document.querySelector(`[data-error-for="${field}"]`);
+    if (el) {
+      el.textContent = msg;
+      el.classList.add("visible");
+    }
+  }
+
+  function getPayload() {
     const fd = new FormData(form);
     return {
-      age: fd.get("age") === "" ? NaN : parseInt(fd.get("age"), 10),
-      gender: fd.get("gender") || "",
+      age: parseInt(fd.get("age"), 10),
+      gender: fd.get("gender"),
       country: (fd.get("country") || "").trim(),
-      academic_level: fd.get("academic_level") || "",
-      most_used_platform: fd.get("most_used_platform") || "",
-      purpose_of_use: fd.get("purpose_of_use") || "",
-      avg_daily_usage_hours: fd.get("avg_daily_usage_hours") === "" ? NaN : parseFloat(fd.get("avg_daily_usage_hours")),
-      daily_unlocks: fd.get("daily_unlocks") === "" ? NaN : parseInt(fd.get("daily_unlocks"), 10),
-      study_hours: fd.get("study_hours") === "" ? NaN : parseFloat(fd.get("study_hours")),
-      physical_activity_hours: fd.get("physical_activity_hours") === "" ? NaN : parseFloat(fd.get("physical_activity_hours")),
-      sleep_hours_per_night: fd.get("sleep_hours_per_night") === "" ? NaN : parseFloat(fd.get("sleep_hours_per_night")),
-      stress_level: fd.get("stress_level") || "",
+      academic_level: fd.get("academic_level"),
+      most_used_platform: fd.get("most_used_platform"),
+      purpose_of_use: fd.get("purpose_of_use"),
+      avg_daily_usage_hours: parseFloat(fd.get("avg_daily_usage_hours")),
+      daily_unlocks: parseInt(fd.get("daily_unlocks"), 10),
+      study_hours: parseFloat(fd.get("study_hours")),
+      physical_activity_hours: parseFloat(fd.get("physical_activity_hours")),
+      sleep_hours_per_night: parseFloat(fd.get("sleep_hours_per_night")),
+      stress_level: fd.get("stress_level"),
     };
   }
 
-  // ---------------------------------------------------------
-  // UI state switching
-  // ---------------------------------------------------------
-  function showState(name) {
-    [stateIdle, stateLoading, stateResult, stateError].forEach((el) => (el.hidden = true));
-    ({ idle: stateIdle, loading: stateLoading, result: stateResult, error: stateError }[name]).hidden = false;
+  function validate(payload) {
+    clearErrors();
+    let valid = true;
+
+    if (isNaN(payload.age) || payload.age < 10 || payload.age > 100) {
+      setError("age", "Please enter a valid age (10–100).");
+      valid = false;
+    }
+    if (!payload.country) {
+      setError("country", "Country is required.");
+      valid = false;
+    }
+    if (isNaN(payload.avg_daily_usage_hours)) {
+      setError("avg_daily_usage_hours", "Please select screen time.");
+      valid = false;
+    }
+    if (isNaN(payload.sleep_hours_per_night)) {
+      setError("sleep_hours_per_night", "Please select sleep hours.");
+      valid = false;
+    }
+    if (!payload.stress_level) {
+      setError("stress_level", "Please select your stress level.");
+      valid = false;
+    }
+
+    return valid;
   }
 
-  function setSubmitting(isSubmitting) {
-    submitBtn.disabled = isSubmitting;
-    submitBtn.classList.toggle("loading", isSubmitting);
+  // -------------------------------------------------------------------------
+  // 6. View States
+  // -------------------------------------------------------------------------
+  function setViewState(state) {
+    resultIdle.style.display = state === "idle" ? "flex" : "none";
+    resultLoading.style.display = state === "loading" ? "flex" : "none";
+    resultError.style.display = state === "error" ? "flex" : "none";
+    resultContent.style.display = state === "result" ? "block" : "none";
   }
 
-  function bandFor(score) {
-    if (score < 4) {
-      return {
-        label: "Signal: strained",
-        context: "Your responses suggest elevated strain right now. Small shifts in sleep or screen time can go a long way.",
-      };
-    }
-    if (score < 7) {
-      return {
-        label: "Signal: balanced",
-        context: "Your rhythm looks fairly steady, with some room to recover and reset.",
-      };
-    }
-    return {
-      label: "Signal: strong",
-      context: "Your habits point to a well-supported, resilient baseline. Keep it up.",
+  // -------------------------------------------------------------------------
+  // 7. Results & Habit Chart
+  // -------------------------------------------------------------------------
+  function renderChart(payload) {
+    const canvas = document.getElementById("habitChart");
+    if (!canvas) return;
+
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const textColor = isDark ? "#94A3B8" : "#475569";
+    const gridColor = isDark ? "#24304A" : "#E2E8F0";
+
+    // Distinct, vibrant colors for each lifestyle dimension
+    const barColors = ["#3B82F6", "#EC4899", "#8B5CF6", "#10B981"];
+
+    const data = {
+      labels: ["Sleep (hrs)", "Screen Time (hrs)", "Study (hrs)", "Exercise (hrs)"],
+      datasets: [
+        {
+          label: "Your Routine",
+          data: [
+            payload.sleep_hours_per_night,
+            payload.avg_daily_usage_hours,
+            payload.study_hours,
+            payload.physical_activity_hours
+          ],
+          backgroundColor: barColors,
+          borderRadius: 6,
+        },
+        {
+          label: "Target Range",
+          data: [8.0, 3.0, 5.0, 1.0],
+          backgroundColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0",
+          borderRadius: 6,
+        }
+      ]
     };
-  }
 
-  function renderResult(score) {
-    const clamped = Math.max(0, Math.min(10, score));
-    const { label, context } = bandFor(clamped);
-
-    scoreNumberEl.textContent = score.toFixed(2);
-    scoreBandEl.textContent = label;
-    scoreContextEl.textContent = context;
-
-    // reset then animate the arc fill on next frame
-    gaugeFill.style.transition = "none";
-    gaugeFill.style.strokeDashoffset = String(GAUGE_ARC_LENGTH);
-    requestAnimationFrame(() => {
-      gaugeFill.style.transition = "";
-      const offset = GAUGE_ARC_LENGTH * (1 - clamped / 10);
-      gaugeFill.style.strokeDashoffset = String(offset);
-    });
-
-    showState("result");
-  }
-
-  function renderError(label, copy) {
-    errorLabelEl.textContent = label;
-    errorCopyEl.textContent = copy;
-    showState("error");
-  }
-
-  // ---------------------------------------------------------
-  // Parse FastAPI / Pydantic 422 error responses into
-  // field-level messages where possible
-  // ---------------------------------------------------------
-  function applyServerValidationErrors(detail) {
-    if (!Array.isArray(detail)) return false;
-    let matched = false;
-    detail.forEach((err) => {
-      const field = Array.isArray(err.loc) ? err.loc[err.loc.length - 1] : null;
-      const input = field ? document.getElementById(field) : null;
-      const target = field === "stress_level" ? stressHiddenInput : input;
-      if (target) {
-        setFieldError(target, err.msg || "Invalid value.");
-        matched = true;
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: "y",
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: {
+            color: textColor,
+            font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: "600" }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { family: "'Plus Jakarta Sans', sans-serif", size: 10 } }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: textColor, font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: "600" } }
+        }
       }
-    });
-    return matched;
+    };
+
+    if (habitChart) {
+      habitChart.destroy();
+    }
+    habitChart = new Chart(canvas, { type: "bar", data, options });
   }
 
-  // ---------------------------------------------------------
-  // Submit handler
-  // ---------------------------------------------------------
-  form.addEventListener("submit", async (e) => {
+  function updateChartColors() {
+    if (!habitChart) return;
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const textColor = isDark ? "#94A3B8" : "#475569";
+    const gridColor = isDark ? "#24304A" : "#E2E8F0";
+
+    habitChart.options.plugins.legend.labels.color = textColor;
+    habitChart.options.scales.x.grid.color = gridColor;
+    habitChart.options.scales.x.ticks.color = textColor;
+    habitChart.options.scales.y.ticks.color = textColor;
+    habitChart.data.datasets[1].backgroundColor = isDark ? "rgba(255, 255, 255, 0.12)" : "#E2E8F0";
+    habitChart.update();
+  }
+
+  function getScoreDetails(score) {
+    if (score >= 7.5) {
+      return {
+        badgeClass: "status-good",
+        badgeText: "Healthy Balance",
+        boxBg: "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.08) 100%)",
+        borderColor: "rgba(16, 185, 129, 0.3)",
+        summary: "Your daily habits reflect steady emotional well-being. Good sleep and active routine are serving you well."
+      };
+    } else if (score >= 5.5) {
+      return {
+        badgeClass: "status-moderate",
+        badgeText: "Moderate Balance",
+        boxBg: "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.08) 100%)",
+        borderColor: "rgba(245, 158, 11, 0.3)",
+        summary: "You have a stable baseline, though occasional high screen time or irregular sleep may cause energy dips."
+      };
+    } else {
+      return {
+        badgeClass: "status-risk",
+        badgeText: "High Stress / Strain",
+        boxBg: "linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(244, 63, 94, 0.08) 100%)",
+        borderColor: "rgba(239, 68, 68, 0.3)",
+        summary: "Your current lifestyle indicators show signs of strain. Making minor adjustments to sleep and screen exposure can bring quick relief."
+      };
+    }
+  }
+
+  function generateRecommendations(payload, score) {
+    recsList.innerHTML = "";
+    const items = [];
+
+    if (payload.sleep_hours_per_night < 7) {
+      items.push({
+        icon: "moon",
+        colorClass: "rec-blue",
+        text: "Try adding 45–60 minutes of sleep. Consistent sleep is the single most effective buffer against academic fatigue."
+      });
+    }
+    if (payload.avg_daily_usage_hours > 5) {
+      items.push({
+        icon: "smartphone",
+        colorClass: "rec-purple",
+        text: "Screen time is on the higher side. Consider setting a daily app timer or turning notifications off during study blocks."
+      });
+    }
+    if (payload.physical_activity_hours < 0.5) {
+      items.push({
+        icon: "activity",
+        colorClass: "rec-emerald",
+        text: "Aim for a short 15–20 minute walk daily. Mild movement significantly improves focus and calms tension."
+      });
+    }
+    if (payload.stress_level === "High" || payload.stress_level === "Very High") {
+      items.push({
+        icon: "coffee",
+        colorClass: "rec-amber",
+        text: "Remember to take real breaks when studying (e.g. 5 minutes away from screens every 50 minutes)."
+      });
+    }
+    if (items.length === 0) {
+      items.push({
+        icon: "check",
+        colorClass: "rec-emerald",
+        text: "Your habits look well-rounded. Keep prioritizing regular sleep schedules and outdoor breaks during exam weeks."
+      });
+    }
+
+    items.slice(0, 3).forEach((item) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div class="rec-bullet-icon ${item.colorClass}">
+          <i data-lucide="${item.icon}"></i>
+        </div>
+        <span>${item.text}</span>
+      `;
+      recsList.appendChild(li);
+    });
+
+    if (window.lucide && typeof window.lucide.createIcons === "function") {
+      window.lucide.createIcons();
+    }
+  }
+
+  function displayResults(score, payload) {
+    currentScore = score;
+    const clamped = Math.max(0, Math.min(10, score));
+    scoreDisplay.textContent = clamped.toFixed(1);
+
+    const details = getScoreDetails(clamped);
+    scoreBadge.className = `score-status-badge ${details.badgeClass}`;
+    scoreBadge.textContent = details.badgeText;
+    scoreSummaryText.textContent = details.summary;
+
+    const scoreBox = document.getElementById("score-box-container");
+    if (scoreBox) {
+      scoreBox.style.background = details.boxBg;
+      scoreBox.style.borderColor = details.borderColor;
+    }
+
+    renderChart(payload);
+    generateRecommendations(payload, clamped);
+
+    setViewState("result");
+  }
+
+  // -------------------------------------------------------------------------
+  // 8. Submit Handler & API Call
+  // -------------------------------------------------------------------------
+  async function onSubmit(e) {
     e.preventDefault();
-    clearAllErrors();
 
-    const payload = collectPayload();
-    const clientErrors = validate(payload);
-
-    if (clientErrors.length > 0) {
-      clientErrors.forEach(([input, msg]) => input && setFieldError(input, msg));
-      clientErrors[0][0]?.focus?.();
+    const payload = getPayload();
+    if (!validate(payload)) {
+      showToast("Please check the highlighted fields.");
       return;
     }
 
-    setSubmitting(true);
-    showState("loading");
+    submitBtn.classList.add("loading");
+    submitBtn.disabled = true;
+    setViewState("loading");
 
     try {
-      const res = await fetch(`${API_BASE}/predict`, {
+      // First try current origin / local server
+      let res = await fetch("/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+        body: JSON.stringify(payload)
+      }).catch(() => null);
+
+      // If local server is not serving or failed, try localhost:8000 then Cloud
+      if (!res || !res.ok) {
+        res = await fetch("http://127.0.0.1:8000/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(() => null);
+      }
+
+      if (!res || !res.ok) {
+        res = await fetch(`${CLOUD_API}/predict`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(() => null);
+      }
+
+      if (!res) {
+        setViewState("error");
+        document.getElementById("error-heading").textContent = "Connection Error";
+        document.getElementById("error-message").textContent = "Could not reach the prediction service. Please ensure the backend is running.";
+        return;
+      }
 
       if (res.status === 422) {
-        const body = await res.json().catch(() => null);
-        const matched = body && applyServerValidationErrors(body.detail);
-        renderError(
-          "Check your inputs",
-          matched
-            ? "The API rejected a few fields — details are marked on the form."
-            : "The API rejected this submission. Please review your inputs and try again."
-        );
+        const errorData = await res.json().catch(() => null);
+        if (errorData && Array.isArray(errorData.detail)) {
+          errorData.detail.forEach((err) => {
+            const field = err.loc[err.loc.length - 1];
+            setError(field, err.msg || "Invalid value");
+          });
+        }
+        setViewState("error");
+        document.getElementById("error-heading").textContent = "Validation Issue";
+        document.getElementById("error-message").textContent = "Some submitted values were rejected. Please review the form.";
         return;
       }
 
       if (!res.ok) {
-        let detailMsg = `The API responded with status ${res.status}.`;
-        const body = await res.json().catch(() => null);
-        if (body && typeof body.detail === "string") detailMsg = body.detail;
-        renderError("Prediction failed", detailMsg);
+        setViewState("error");
+        document.getElementById("error-heading").textContent = `Error (${res.status})`;
+        document.getElementById("error-message").textContent = "The server could not process your request right now.";
         return;
       }
 
       const data = await res.json();
       if (typeof data.predicted_mental_health_score !== "number") {
-        renderError("Unexpected response", "The API responded, but the score was missing or malformed.");
+        setViewState("error");
+        document.getElementById("error-heading").textContent = "Invalid Response";
+        document.getElementById("error-message").textContent = "The model did not return a valid score.";
         return;
       }
 
-      renderResult(data.predicted_mental_health_score);
+      displayResults(data.predicted_mental_health_score, payload);
+
     } catch (err) {
-      renderError(
-        "Can't reach the server",
-        `Couldn't connect to ${API_BASE}. Make sure the backend is running (uvicorn main:app --port 2200 --reload) and reachable from this page.`
-      );
+      setViewState("error");
+      document.getElementById("error-heading").textContent = "Unexpected Error";
+      document.getElementById("error-message").textContent = err.message || "An unexpected error occurred.";
     } finally {
-      setSubmitting(false);
+      submitBtn.classList.remove("loading");
+      submitBtn.disabled = false;
     }
-  });
+  }
 
-  // live-clear errors as the user edits
-  form.querySelectorAll("input, select").forEach((el) => {
-    el.addEventListener("input", () => clearFieldError(el));
-    el.addEventListener("change", () => clearFieldError(el));
-  });
+  // -------------------------------------------------------------------------
+  // 9. Actions & Init
+  // -------------------------------------------------------------------------
+  function initActions() {
+    sampleDataBtn.addEventListener("click", fillSampleData);
 
-  resetBtn.addEventListener("click", () => {
-    showState("idle");
-  });
+    resetBtn.addEventListener("click", () => {
+      clearErrors();
+      setViewState("idle");
+      setTimeout(() => {
+        document.getElementById("avg_daily_usage_hours").dispatchEvent(new Event("input"));
+        document.getElementById("daily_unlocks").dispatchEvent(new Event("input"));
+        document.getElementById("sleep_hours_per_night").dispatchEvent(new Event("input"));
+        document.getElementById("study_hours").dispatchEvent(new Event("input"));
+        document.getElementById("physical_activity_hours").dispatchEvent(new Event("input"));
+      }, 50);
+      showToast("Form reset");
+    });
 
-  errorRetryBtn.addEventListener("click", () => {
-    showState("idle");
-  });
+    retryBtn.addEventListener("click", () => {
+      form.dispatchEvent(new Event("submit"));
+    });
+
+    retestBtn.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    copyBtn.addEventListener("click", () => {
+      const payload = getPayload();
+      const text = `Mental Health Detector — Student Wellness Score: ${currentScore.toFixed(1)}/10\nSleep: ${payload.sleep_hours_per_night}h | Screen: ${payload.avg_daily_usage_hours}h | Study: ${payload.study_hours}h | Stress: ${payload.stress_level}`;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast("Summary copied to clipboard");
+      }).catch(() => {
+        showToast("Could not copy to clipboard");
+      });
+    });
+
+    form.addEventListener("submit", onSubmit);
+  }
+
+  function init() {
+    initTheme();
+    initSliders();
+    initActions();
+
+    if (window.lucide && typeof window.lucide.createIcons === "function") {
+      window.lucide.createIcons();
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
 })();

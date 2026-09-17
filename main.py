@@ -1,6 +1,8 @@
 import joblib
+import os
 import pandas as pd
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from typing import Literal
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,9 +46,30 @@ class PredictionResponse(BaseModel):
 
 
 
+@app.get('/health')
+def health_check():
+    return {"status": "ok", "service": "Mental-Health-Detector"}
+
+
 @app.get('/')
-def greet():
+def home():
+    if os.path.exists('index.html'):
+        return FileResponse('index.html')
     return {'Welcome to Sheryians AI School Guys'}
+
+
+@app.get('/style.css')
+def get_css():
+    if os.path.exists('style.css'):
+        return FileResponse('style.css', media_type='text/css')
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+
+@app.get('/script.js')
+def get_js():
+    if os.path.exists('script.js'):
+        return FileResponse('script.js', media_type='application/javascript')
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
 
 
 @app.post('/predict', response_model=PredictionResponse) #6.77777
